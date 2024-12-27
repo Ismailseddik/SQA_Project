@@ -6,6 +6,7 @@ from src.data_ingestion import DataIngestion
 from src.data_processing import DataProcessing
 from src.insights import Insights
 from src.ISO_CMMI_Analyzer import ChecklistAnalysis
+import os
 
 
 def plot_kpi_charts(data, insights, kpis):
@@ -111,8 +112,9 @@ def plot_kpi_charts(data, insights, kpis):
 
 def main():
     # File path for the mock data
-    DATA_FILE = "SQA_Project/data/mock_data.csv"
-
+    DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "mock_data.csv")
+    print("Resolved data file path:", DATA_FILE)
+    print("Current working directory:", os.getcwd())
     try:
         # Load data
         required_columns = ['Project', 'CSAT', 'OnTimeDelivery', 'BudgetVariance']
