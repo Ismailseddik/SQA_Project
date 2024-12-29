@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
+from tkinter import messagebox
 from src.data_ingestion import DataIngestion
 from src.data_processing import DataProcessing
 from src.insights import Insights
@@ -19,8 +20,18 @@ def plot_trends(data, trends, parent_frame):
     fig, ax = plt.subplots(figsize=(6, 4))
     
     # Plot trends for each column
-    for column in ['CSAT', 'OnTimeDelivery', 'BudgetVariance']:
+    for idx, column in enumerate(['CSAT', 'OnTimeDelivery', 'BudgetVariance']):
         ax.plot(data["Project"], data[column], marker="o", label=f"{column} Trend")
+        # Add trend annotations (if trends list is populated)
+        if idx < len(trends):
+            ax.text(
+                len(data["Project"]) - 1, 
+                data[column].iloc[-1], 
+                trends[idx], 
+                fontsize=9, 
+                verticalalignment="center", 
+                horizontalalignment="right"
+            )
 
     # Set the chart title and labels
     ax.set_title("Trend Visualization")
@@ -33,7 +44,8 @@ def plot_trends(data, trends, parent_frame):
     canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 
-def plot_kpi_charts(data, insights, kpis,trends):
+
+def plot_kpi_charts(data, insights, kpis, trends):
     """
     Generates Matplotlib charts for KPIs and embeds them in a horizontally scrollable Tkinter window.
     Displays averages and insights in a resizable panel.
@@ -77,6 +89,7 @@ def plot_kpi_charts(data, insights, kpis,trends):
 
     canvas1 = FigureCanvasTkAgg(fig1, chart_frame)
     canvas1.get_tk_widget().grid(row=0, column=0, padx=10, pady=10)
+    plt.close(fig1)  # Close the figure to free memory
 
     # On-Time Delivery Bar Chart
     fig2, ax2 = plt.subplots(figsize=(6, 4))
@@ -87,6 +100,7 @@ def plot_kpi_charts(data, insights, kpis,trends):
 
     canvas2 = FigureCanvasTkAgg(fig2, chart_frame)
     canvas2.get_tk_widget().grid(row=0, column=1, padx=10, pady=10)
+    plt.close(fig2)  # Close the figure to free memory
 
     # Budget Variance Bar Chart
     fig3, ax3 = plt.subplots(figsize=(6, 4))
@@ -98,6 +112,7 @@ def plot_kpi_charts(data, insights, kpis,trends):
 
     canvas3 = FigureCanvasTkAgg(fig3, chart_frame)
     canvas3.get_tk_widget().grid(row=0, column=2, padx=10, pady=10)
+    plt.close(fig3)  # Close the figure to free memory
 
     # Create a frame for insights and averages
     insights_frame = tk.Frame(paned_window)
@@ -121,12 +136,7 @@ def plot_kpi_charts(data, insights, kpis,trends):
         insights_text.insert(tk.END, f"- {insight}\n")
 
     insights_text.config(state=tk.DISABLED)  # Make the text widget read-only
-    # Create a new frame for trend visualization
-    trends_frame = tk.Frame(paned_window)
-    paned_window.add(trends_frame)
 
-    # Add trend visualization
-    plot_trends(data, trends, trends_frame)
     # Properly terminate mainloop on window close
     def on_closing():
         print("Exiting GUI...")
@@ -137,24 +147,120 @@ def plot_kpi_charts(data, insights, kpis,trends):
     root.mainloop()
 
 
+def collect_user_data():
+    """
+    Provides a GUI interface for users to input data manually.
+    :return: A pandas DataFrame containing the user-provided data.
+    """
+    input_window = tk.Tk()
+    input_window.title("KPI Dashboard - Enter Project Data")
+    input_window.geometry("600x500")
+    input_window.configure(bg="#eaf2f8")
+
+    # Add a header with styling
+    header = tk.Label(input_window, text="Enter Project Data", font=("Helvetica", 20, "bold"), bg="#eaf2f8", fg="#34495e")
+    header.pack(pady=10)
+
+    # Add a description below the header
+    description = tk.Label(
+        input_window, 
+        text="Please enter the data for each field below. Ensure consistency across all rows.", 
+        font=("Arial", 12), bg="#eaf2f8", fg="#7f8c8d", wraplength=500, justify="center"
+    )
+    description.pack(pady=10)
+
+    # Create a frame for the input fields
+    input_frame = tk.Frame(input_window, bg="#eaf2f8")
+    input_frame.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
+
+    # Define fields without percentages
+    fields = ["Project", "CSAT", "OnTimeDelivery", "BudgetVariance"]
+    entries = []
+
+    def validate_input():
+        """Validate input dynamically."""
+        try:
+            for entry in entries[1:]:  # Skip 'Project' field
+                values = entry.get("1.0", tk.END).strip().split("\n")
+                # Check if all values are numeric
+                if not all(v.strip().replace(".", "").isdigit() for v in values):
+                    entry.config(bg="#f9ebea")  # Red background for invalid input
+                else:
+                    entry.config(bg="#eafaf1")  # Green background for valid input
+        except Exception:
+            pass
+
+    def submit_data():
+        """Collect data from entry fields and store it in a DataFrame."""
+        try:
+            projects = []
+            for i, entry in enumerate(entries):
+                column_data = entry.get("1.0", tk.END).strip().split("\n")
+                projects.append(column_data)
+
+            # Ensure equal number of rows in all columns
+            if len(set(len(col) for col in projects)) > 1:
+                raise ValueError("All columns must have the same number of rows.")
+
+            # Construct a DataFrame
+            data_dict = {fields[i]: projects[i] for i in range(len(fields))}
+            user_data = pd.DataFrame(data_dict)
+
+            # Convert numeric columns to appropriate data types
+            user_data["CSAT"] = pd.to_numeric(user_data["CSAT"])
+            user_data["OnTimeDelivery"] = pd.to_numeric(user_data["OnTimeDelivery"])
+            user_data["BudgetVariance"] = pd.to_numeric(user_data["BudgetVariance"])
+
+            # Close the input window
+            input_window.destroy()
+
+            # Process the data
+            process_and_plot(user_data)
+        except Exception as e:
+            messagebox.showerror("Input Error", f"An error occurred: {e}")
+
+    def reset_fields():
+        """Reset all fields to default."""
+        for entry in entries:
+            entry.delete("1.0", tk.END)
+
+    # Create input labels and text areas in a grid layout
+    for i, field in enumerate(fields):
+        label = tk.Label(input_frame, text=f"{field}:", font=("Arial", 12), bg="#eaf2f8", fg="#34495e")
+        label.grid(row=i, column=0, sticky="w", padx=10, pady=5)
+        text_area = tk.Text(input_frame, height=3, width=30, font=("Arial", 10), relief=tk.GROOVE, bd=2)
+        text_area.grid(row=i, column=1, padx=10, pady=5)
+        text_area.bind("<KeyRelease>", lambda e: validate_input())
+        entries.append(text_area)
+
+    # Create a frame for buttons
+    button_frame = tk.Frame(input_window, bg="#eaf2f8")
+    button_frame.pack(pady=20)
+
+    # Add a submit button
+    submit_button = tk.Button(button_frame, text="Submit Data", font=("Arial", 12, "bold"), bg="#28a745", fg="white",
+                              relief=tk.RAISED, bd=3, command=submit_data)
+    submit_button.grid(row=0, column=0, padx=10)
+
+    # Add a reset button
+    reset_button = tk.Button(button_frame, text="Reset", font=("Arial", 12, "bold"), bg="#dc3545", fg="white",
+                             relief=tk.RAISED, bd=3, command=reset_fields)
+    reset_button.grid(row=0, column=1, padx=10)
+
+    input_window.mainloop()
 
 
-def main():
-    # File path for the mock data
-    DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "mock_data.csv")
-    print("Current working directory:", os.getcwd())
+def process_and_plot(user_data):
+    """
+    Process the user-provided data and pass it to the existing functions for analysis and visualization.
+    :param user_data: A pandas DataFrame containing the user-provided data.
+    """
     try:
-        # Load data
+        # Validate data
         required_columns = ['Project', 'CSAT', 'OnTimeDelivery', 'BudgetVariance']
         data_ingestion = DataIngestion(required_columns=required_columns)
-        raw_data = data_ingestion.load_data(DATA_FILE)
+        validated_data = data_ingestion.validate_data(user_data)
 
-        if raw_data is None:
-            print("Error: Data could not be loaded.")
-            return
-
-        # Validate data
-        validated_data = data_ingestion.validate_data(raw_data)
         if validated_data is None:
             print("Error: Data validation failed.")
             return
@@ -174,13 +280,18 @@ def main():
             if trend:
                 trends.append(trend)
 
+        # Debug: Print trends to ensure they are being calculated
+        print("Trends detected:", trends)
+
         # Generate insights
         insights_generator = Insights()
         insights = insights_generator.generate_insights(kpis, validated_data)
+
         # Add detected trends to insights
         insights.append("Detected Trends:")
         for trend in trends:
             insights.append(f"- {trend}")
+
         # ISO/CMMI Checklist Evaluation
         checklist = ChecklistAnalysis()
 
@@ -198,11 +309,93 @@ def main():
             insights.append(f"- {key}: {value}")
 
         # Plot KPI charts in a GUI and display insights
-        plot_kpi_charts(validated_data, insights,kpis,trends)
+        plot_kpi_charts(validated_data, insights, kpis, trends)
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
+
+
+def main():
+    """
+    Main function to either load static data or allow user to enter data dynamically.
+    """
+    
+    print("Select Mode:")
+    print("1. Load Data from File")
+    print("2. Enter Data Manually")
+
+    choice = input("Enter your choice (1 or 2): ").strip()
+
+    if choice == "1":
+        # File path for the mock data
+        DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "mock_data.csv")
+        print("Current working directory:", os.getcwd())
+        try:
+            # Load data
+            required_columns = ['Project', 'CSAT', 'OnTimeDelivery', 'BudgetVariance']
+            data_ingestion = DataIngestion(required_columns=required_columns)
+            raw_data = data_ingestion.load_data(DATA_FILE)
+
+            if raw_data is None:
+                print("Error: Data could not be loaded.")
+                return
+
+            # Validate data
+            validated_data = data_ingestion.validate_data(raw_data)
+            if validated_data is None:
+                print("Error: Data validation failed.")
+                return
+
+            # Process data to calculate KPIs
+            data_processing = DataProcessing()
+            kpis = data_processing.calculate_kpis(validated_data)
+
+            if kpis is None:
+                print("Error: KPI calculation failed.")
+                return
+
+            # Detect trends
+            trends = []
+            for column in ['CSAT', 'OnTimeDelivery', 'BudgetVariance']:
+                trend = data_processing.detect_trends(validated_data, column)
+                if trend:
+                    trends.append(trend)
+
+            # Generate insights
+            insights_generator = Insights()
+            insights = insights_generator.generate_insights(kpis, validated_data)
+            # Add detected trends to insights
+            insights.append("Detected Trends:")
+            for trend in trends:
+                insights.append(f"- {trend}")
+            # ISO/CMMI Checklist Evaluation
+            checklist = ChecklistAnalysis()
+
+            print("\nCollecting responses for ISO 9001 Checklist:")
+            iso_responses = checklist.collect_responses(checklist.iso_9001_checklist)
+
+            print("\nCollecting responses for CMMI Checklist:")
+            cmmi_responses = checklist.collect_responses(checklist.cmmi_checklist)
+
+            checklist_summary = checklist.generate_summary(iso_responses, cmmi_responses)
+
+            # Include checklist summary in insights
+            insights.append("ISO/CMMI Checklist Evaluation Summary:")
+            for key, value in checklist_summary.items():
+                insights.append(f"- {key}: {value}")
+
+            # Plot KPI charts in a GUI and display insights
+            plot_kpi_charts(validated_data, insights, kpis, trends)
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+
+    elif choice == "2":
+        collect_user_data()
+
+    else:
+        print("Invalid choice. Please restart the program.")
 
 if __name__ == "__main__":
     main()
