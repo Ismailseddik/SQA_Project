@@ -53,33 +53,3 @@ class Visualization:
             print(f"Error generating Budget Variance chart: {e}")
             return None
 
-# Example usage
-if __name__ == "__main__":
-    import pandas as pd
-
-    # Load sample data
-    file_path = "data/mock_data.csv"
-    try:
-        data = pd.read_csv(file_path)
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        data = None
-
-    if data is not None:
-        # Initialize the Visualization class
-        viz = Visualization()
-
-        # Generate and display CSAT chart
-        csat_chart = viz.generate_csat_chart(data)
-        if csat_chart:
-            csat_chart.show()
-
-        # Generate and display On-Time Delivery chart
-        on_time_chart = viz.generate_on_time_chart(data)
-        if on_time_chart:
-            on_time_chart.show()
-
-        # Generate and display Budget Variance chart
-        budget_chart = viz.generate_budget_chart(data)
-        if budget_chart:
-            budget_chart.show()

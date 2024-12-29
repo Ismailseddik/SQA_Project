@@ -67,27 +67,4 @@ class DataProcessing:
 
         return None
 
-# Example usage
-if __name__ == "__main__":
-    # Load sample data
-    file_path = "data/mock_data.csv"
-    try:
-        data = pd.read_csv(file_path)
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        data = None
 
-    if data is not None:
-        # Initialize the DataProcessing class
-        data_processor = DataProcessing()
-
-        # Calculate KPIs
-        kpis = data_processor.calculate_kpis(data)
-        if kpis is not None:
-            for kpi, value in kpis.items():
-                print(f"{kpi}: {value}")
-
-        # Detect trends
-        trend = data_processor.detect_trends(data, column='CSAT')
-        if trend:
-            print(trend)
