@@ -8,8 +8,32 @@ from src.insights import Insights
 from src.ISO_CMMI_Analyzer import ChecklistAnalysis
 import os
 
+def plot_trends(data, trends, parent_frame):
+    """
+    Visualizes trends in the data as additional line plots.
+    :param data: The project dataset.
+    :param trends: Detected trends for specific columns.
+    :param parent_frame: The parent frame in which to embed the trend charts.
+    """
+    # Create a figure for the trend charts
+    fig, ax = plt.subplots(figsize=(6, 4))
+    
+    # Plot trends for each column
+    for column in ['CSAT', 'OnTimeDelivery', 'BudgetVariance']:
+        ax.plot(data["Project"], data[column], marker="o", label=f"{column} Trend")
 
-def plot_kpi_charts(data, insights, kpis):
+    # Set the chart title and labels
+    ax.set_title("Trend Visualization")
+    ax.set_xlabel("Project")
+    ax.set_ylabel("Values")
+    ax.legend()
+
+    # Embed the figure in the parent frame
+    canvas = FigureCanvasTkAgg(fig, parent_frame)
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+
+def plot_kpi_charts(data, insights, kpis,trends):
     """
     Generates Matplotlib charts for KPIs and embeds them in a horizontally scrollable Tkinter window.
     Displays averages and insights in a resizable panel.
@@ -97,7 +121,12 @@ def plot_kpi_charts(data, insights, kpis):
         insights_text.insert(tk.END, f"- {insight}\n")
 
     insights_text.config(state=tk.DISABLED)  # Make the text widget read-only
+    # Create a new frame for trend visualization
+    trends_frame = tk.Frame(paned_window)
+    paned_window.add(trends_frame)
 
+    # Add trend visualization
+    plot_trends(data, trends, trends_frame)
     # Properly terminate mainloop on window close
     def on_closing():
         print("Exiting GUI...")
@@ -138,9 +167,20 @@ def main():
             print("Error: KPI calculation failed.")
             return
 
+        # Detect trends
+        trends = []
+        for column in ['CSAT', 'OnTimeDelivery', 'BudgetVariance']:
+            trend = data_processing.detect_trends(validated_data, column)
+            if trend:
+                trends.append(trend)
+
         # Generate insights
         insights_generator = Insights()
         insights = insights_generator.generate_insights(kpis, validated_data)
+        # Add detected trends to insights
+        insights.append("Detected Trends:")
+        for trend in trends:
+            insights.append(f"- {trend}")
         # ISO/CMMI Checklist Evaluation
         checklist = ChecklistAnalysis()
 
@@ -158,7 +198,7 @@ def main():
             insights.append(f"- {key}: {value}")
 
         # Plot KPI charts in a GUI and display insights
-        plot_kpi_charts(validated_data, insights,kpis)
+        plot_kpi_charts(validated_data, insights,kpis,trends)
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
